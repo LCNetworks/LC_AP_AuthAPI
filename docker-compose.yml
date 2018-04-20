@@ -1,0 +1,14 @@
+version: '2'
+
+services:
+  sso-oauth2:
+    extends:
+      file: docker-common.yml
+      service: common
+    image: registry.cn-hangzhou.aliyuncs.com/gehc/sso-oauth2
+    ports:
+        - 8800:8800
+    environment:
+      server.port: 80
+    volumes:
+      - /apps/config:/apps/config

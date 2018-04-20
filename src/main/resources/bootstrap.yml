@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: sso-oauth2
+  cloud:
+    config:
+      uri:  http://config-server:8801
+      profile: dev
+    name: sso-oauth2
+    zookeeper:
+      dicovery:
+        perfer-ip-address: true
+      connect-string: zookeeper:2181
+server:
+  port: 8800
+  tomcat:
+    uri-encoding: UTF-8

@@ -1,0 +1,192 @@
+apply plugin: 'java'
+apply plugin: 'propdeps'
+apply plugin: 'com.gorylenko.gradle-git-properties'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'maven'
+
+def group = 'cn.com.project'
+def version = '0.0.1'
+
+jar {
+    baseName = 'LC_AP_AuthAPI'
+    version = ''
+    manifest {
+        attributes 'Main-Class': 'cn.com.project.common.LcApAuthApiApplication'
+    }
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+compileJava.options.encoding = 'UTF-8'
+
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url 'http://repo.spring.io/plugins-release' }
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath 'org.springframework.build.gradle:propdeps-plugin:0.0.6'
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:1.5.9.RELEASE"
+        classpath "com.sarhanm:gradle-versioner:2.3.14"
+        classpath "gradle.plugin.com.gorylenko.gradle-git-properties:gradle-git-properties:1.4.17"
+    }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.cloud:spring-cloud-dependencies:Edgware.RELEASE'
+    }
+    dependencies {
+        dependency 'com.google.guava:guava:20.0'
+    }
+}
+
+defaultTasks 'verification','clean','release'
+
+
+
+
+dependencies {
+    compile fileTree(dir: 'src/main/webapp/WEB-INF/lib', include: '*.jar')
+    testCompile 'junit:junit:4.+'
+    testCompile "org.springframework.boot:spring-boot-starter-test"
+    compile('org.springframework.cloud:spring-cloud-starter-zookeeper-discovery') {
+        exclude group: 'com.netflix.ribbon'
+        exclude module: 'spring-cloud-starter-archaius'
+        exclude module: 'spring-cloud-netflix-core'
+    }
+    compile "org.springframework.cloud:spring-cloud-starter-config"
+
+    compile "org.springframework.boot:spring-boot-starter"
+    compile("org.springframework.boot:spring-boot-starter-web")
+    compile "org.springframework.boot:spring-boot-starter-actuator"
+
+    compile "org.springframework.boot:spring-boot-starter-data-redis"
+    compile('org.springframework.boot:spring-boot-starter-jdbc'){
+        exclude module: "spring-boot-starter-logging"
+        exclude module: "logback-classic"
+    }
+
+    optional "org.springframework.boot:spring-boot-configuration-processor"
+
+    compile "org.projectlombok:lombok:1.16.+"
+
+    compile 'io.springfox:springfox-swagger-ui:2.5.0'
+    compile 'io.springfox:springfox-swagger2:2.5.0'
+
+    compile("javax.validation:validation-api:2.0.1.Final")
+    compile('mysql:mysql-connector-java:5.1.42')
+
+    compile("gehc.gst.smartx.db:core-db:0.6.10")
+
+    compile('org.projectlombok:lombok:1.16.+')
+    runtime('mysql:mysql-connector-java:5.1.42')
+    compile files('../libs/ih-db-tools.jar')
+    compile files('../libs/ihtools-1.8.2-SNAPSHOT.jar')
+
+}
+
+jar.manifest.attributes.put 'Implementation-Version', version
+jar.manifest.attributes.put 'Implementation-Title', project.name
+
+task verification {
+    doFirst {
+        subprojects.each {
+            if (it.name != 'project-settings') {
+
+                def c = "Build for verification"
+                println("Cloud_service.gradle.verification(): submodule="+it.name+".")
+                createVersionDesc(it.name, c)
+            }
+        }
+    }
+}
+
+task daily {
+    doFirst {
+        subprojects.each {
+            if (it.name != 'project-settings') {
+                def c = "Daily build"
+                createVersionDesc(it.name, c)
+            }
+        }
+    }
+}
+
+task release{
+    subprojects.each {
+        if (it.name != 'common-lib') {
+            dependsOn it.bootRepackage
+        }
+    }
+}
+
+def createVersionDesc(moduleName,c){
+    def t = getBuildTime()
+    def v = getVersion()
+    def b = getCurrentBranch()
+    writeVersionDesc(moduleName,v,t,c,b)
+    print("moudleName:"+moduleName+",comment:"+c+"\n")
+}
+
+task testMyWork << {
+    getVersion()
+    def t = getBuildTime()
+    print("timestamp："+t)
+}
+
+def getVersion(){
+    def proc = "git rev-parse --short HEAD".execute()
+    proc.waitFor()
+    def r = proc.in.text.replace("\n","")
+    return r
+}
+
+def getBuildTime(){
+    return new Date().format("yyyy-MM-dd HH:mm:ss")
+}
+
+def getCurrentBranch(){
+    def proc = "git symbolic-ref --short -q HEAD".execute()
+    proc.waitFor()
+    def r = proc.in.text.replace("\n","")
+    return r
+}
+
+def writeVersionDesc(moduleName,versionId,buildTs,comment,branch){
+    //def  cmd = 'mkdir -p '+moduleName + '/src/main/resources/static'
+    //def proc = cmd.execute()
+    //proc.waitFor()
+    def file=new File(moduleName+'/src/main/resources/static/version.json')
+    //if (file.exists())
+    //file.delete()
+
+    def printWriter = file.newPrintWriter()
+    printWriter.write("{\"version\":\""+versionId+"\","
+            +"\"build_time\":\""+buildTs+"\","
+            +"\"branch\":\""+branch+"\","
+            +"\"comment\":\""+comment+"\"}")
+    printWriter.flush()
+    printWriter.close()
+
+
+    file=new File(moduleName+'/src/main/resources/application.properties')
+    //if (file.exists())
+    //file.delete()
+    /*
+    product.build.version=24647b8
+product.build.time=2017-06-25 16:27:55
+product.build.branch=Dev
+product.build.comment=Build for verification
+     */
+
+    printWriter = file.newPrintWriter()
+    printWriter.write("product.build.version="+versionId+"\n"
+            +"product.build.time="+buildTs+"\n"
+            +"product.build.branch="+branch+"\n"
+            +"product.build.comment="+comment+"\n")
+    printWriter.flush()
+    printWriter.close()
+}
+
